@@ -9,6 +9,7 @@ import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
 import AuthPage from './pages/AuthPage'
 import Profile from './pages/Profile'
+import MyGames from './pages/MyGames'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/create" element={<ProtectedRoute><CreateListing /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/find" element={<ProtectedRoute><FindListing /></ProtectedRoute>} />
+            <Route path="/my-games" element={<ProtectedRoute><MyGames /></ProtectedRoute>} />
           </Routes>
       </AuthProvider>
   )

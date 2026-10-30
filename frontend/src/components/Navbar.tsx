@@ -46,6 +46,16 @@ function Navbar() {
                     (user ? (
                         <>
                             <NavLink
+                                to="/my-games"
+                                className={({ isActive }) =>
+                                    `text-sm font-medium transition-colors ${
+                                        isActive ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'
+                                    }`
+                                }
+                            >
+                                My Games
+                            </NavLink>
+                            <NavLink
                                 to="/profile"
                                 className={({ isActive }) =>
                                     `text-sm font-medium transition-colors ${
