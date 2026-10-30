@@ -10,6 +10,9 @@ import ProtectedRoute from './auth/ProtectedRoute'
 import AuthPage from './pages/AuthPage'
 import Profile from './pages/Profile'
 import MyGames from './pages/MyGames'
+import VenueNew from './pages/VenueNew'
+import VenueManage from './pages/VenueManage'
+import VenuePage from './pages/VenuePage'
 
 function App() {
   return (
@@ -27,6 +30,9 @@ function App() {
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/find" element={<ProtectedRoute><FindListing /></ProtectedRoute>} />
             <Route path="/my-games" element={<ProtectedRoute><MyGames /></ProtectedRoute>} />
+            <Route path="/local/new" element={<ProtectedRoute><VenueNew /></ProtectedRoute>} />
+            <Route path="/local/:code" element={<ProtectedRoute><VenuePage /></ProtectedRoute>} />
+            <Route path="/local/:code/manage" element={<ProtectedRoute><VenueManage /></ProtectedRoute>} />
           </Routes>
       </AuthProvider>
   )
