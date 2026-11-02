@@ -25,11 +25,14 @@ export type QueueGroup = {
     called_at: string | null
     expires_at: string | null
     started_at: string | null
+    walk_up: boolean
+    staff_action: string | null
+    staff_action_at: string | null
     group_members: GroupMember[]
 }
 
 export const GROUP_SELECT =
-    'id, venue_id, leader_id, sport, players_needed, skill_level, status, sort_key, defer_count, deferred_until, court_id, called_at, expires_at, started_at, group_members(id, user_id, guest_name, joined_at, profile:profiles!group_members_user_id_fkey(display_name))'
+    'id, venue_id, leader_id, sport, players_needed, skill_level, status, sort_key, defer_count, deferred_until, court_id, called_at, expires_at, started_at, walk_up, staff_action, staff_action_at, group_members(id, user_id, guest_name, joined_at, profile:profiles!group_members_user_id_fkey(display_name))'
 
 export const MAX_GROUP_SIZE = 8
 
@@ -37,21 +40,35 @@ export function memberName(member: GroupMember) {
     return member.profile?.display_name || member.guest_name || 'Player'
 }
 
+// Walk-up groups are led by a staff member
 export function leaderName(group: QueueGroup) {
+    if (group.walk_up) {
+        const first = group.group_members[0]
+        return first ? memberName(first) : 'Walk-up'
+    }
+
     const leader = group.group_members.find((member) => member.user_id === group.leader_id)
     return leader ? memberName(leader) : 'Someone'
 }
 
 export function groupTitle(group: QueueGroup) {
-    return `${leaderName(group)}'s group`
+    return group.walk_up ? `${leaderName(group)}'s group (walk-up)` : `${leaderName(group)}'s group`
 }
 
 export function formatName(playersNeeded: number) {
     return playersNeeded === 2 ? 'Singles' : 'Doubles'
 }
 
+// True for a short while after staff move a group, so the group's players
+// understand why their place changed.
+export function wasMovedByStaff(group: QueueGroup) {
+    if (group.staff_action !== 'moved' || !group.staff_action_at) return false
+    return Date.now() - new Date(group.staff_action_at).getTime() < 10 * 60 * 1000
+}
+
 export const queueApi = {
-    // Expires overdue calls and fills free courts. Safe to call from multiple user pages
+    // Expires overdue calls and fills free courts. Safe to call from many
+    // pages at once.
     process: (venueId: string) =>
         supabase.rpc('process_venue_queue', { p_venue_id: venueId }),
 
@@ -87,4 +104,56 @@ export const queueApi = {
     finish: (groupId: string) => supabase.rpc('finish_game', { p_group_id: groupId }),
 
     groupCode: (groupId: string) => supabase.rpc('get_group_code', { p_group_id: groupId }),
+}
+
+// Staff-only actions. They ignore other rules
+export const staffApi = {
+    addWalkup: (args: {
+        venueId: string
+        sport: string
+        playersNeeded: number
+        skill: string
+        names: string[]
+    }) =>
+        supabase.rpc('staff_add_walkup', {
+            p_venue_id: args.venueId,
+            p_sport: args.sport,
+            p_players_needed: args.playersNeeded,
+            p_skill: args.skill,
+            p_names: args.names,
+        }),
+
+    moveGroup: (groupId: string, afterGroupId: string | null) =>
+        supabase.rpc('staff_move_group', {
+            p_group_id: groupId,
+            p_after_group_id: afterGroupId,
+        }),
+
+    removeGroup: (groupId: string) => supabase.rpc('staff_remove_group', { p_group_id: groupId }),
+
+    assignCourt: (groupId: string, courtId: string, start: boolean) =>
+        supabase.rpc('staff_assign_court', {
+            p_group_id: groupId,
+            p_court_id: courtId,
+            p_start: start,
+        }),
+
+    respond: (groupId: string, accept: boolean) =>
+        supabase.rpc('staff_respond_to_call', { p_group_id: groupId, p_accept: accept }),
+
+    cancelCall: (groupId: string) => supabase.rpc('staff_cancel_call', { p_group_id: groupId }),
+
+    endGame: (groupId: string) => supabase.rpc('staff_end_game', { p_group_id: groupId }),
+
+    setCourtStatus: (courtId: string, status: 'available' | 'unavailable') =>
+        supabase.rpc('staff_set_court_status', { p_court_id: courtId, p_status: status }),
+
+    setAutoCalling: (venueId: string, on: boolean) =>
+        supabase.rpc('staff_set_auto_calling', { p_venue_id: venueId, p_on: on }),
+
+    addGuest: (groupId: string, name: string) =>
+        supabase.rpc('staff_add_guest', { p_group_id: groupId, p_name: name }),
+
+    removeMember: (memberId: string) =>
+        supabase.rpc('staff_remove_member', { p_member_id: memberId }),
 }

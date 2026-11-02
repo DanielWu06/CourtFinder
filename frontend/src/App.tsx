@@ -13,6 +13,7 @@ import MyGames from './pages/MyGames'
 import VenueNew from './pages/VenueNew'
 import VenueManage from './pages/VenueManage'
 import VenuePage from './pages/VenuePage'
+import VenueStaff from './pages/VenueStaff'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/local/new" element={<ProtectedRoute><VenueNew /></ProtectedRoute>} />
             <Route path="/local/:code" element={<ProtectedRoute><VenuePage /></ProtectedRoute>} />
             <Route path="/local/:code/manage" element={<ProtectedRoute><VenueManage /></ProtectedRoute>} />
+            <Route path="/local/:code/staff" element={<ProtectedRoute><VenueStaff /></ProtectedRoute>} />
           </Routes>
       </AuthProvider>
   )

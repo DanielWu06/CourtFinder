@@ -5,6 +5,7 @@ import {
     queueApi,
     memberName,
     formatName,
+    wasMovedByStaff,
     MAX_GROUP_SIZE,
     type QueueGroup,
 } from '../lib/queue'
@@ -16,6 +17,7 @@ type Props = {
     venue: Venue
     courts: Court[]
     userId: string
+    // Place among waiting groups, or null when called or playing.
     position: number | null
     onChange: () => Promise<void>
     onNotice: (notice: Notice | null) => void
@@ -208,6 +210,12 @@ function MyGroupPanel({ group, venue, courts, userId, position, onChange, onNoti
                     {skipped && (
                         <p className="mt-1 text-gray-500">
                             You recently deferred, so you're skipped for a short while.
+                        </p>
+                    )}
+
+                    {wasMovedByStaff(group) && (
+                        <p className="mt-1 text-purple-700">
+                            Venue staff recently moved your group in line.
                         </p>
                     )}
                 </div>

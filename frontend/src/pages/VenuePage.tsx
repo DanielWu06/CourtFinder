@@ -12,7 +12,13 @@ import {
     type Venue,
     type Court,
 } from '../lib/venues'
-import { memberName, groupTitle, formatName, type QueueGroup } from '../lib/queue'
+import {
+    memberName,
+    groupTitle,
+    formatName,
+    wasMovedByStaff,
+    type QueueGroup,
+} from '../lib/queue'
 import { useVenueQueue } from '../lib/useVenueQueue'
 import { useCallAlert } from '../lib/alerts'
 import { Countdown, Elapsed } from '../components/LiveClock'
@@ -95,6 +101,11 @@ function QueueList({ groups, userId }: { groups: QueueGroup[]; userId: string | 
                                 {missing > 0 && (
                                     <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700">
                                         Needs {missing} more
+                                    </span>
+                                )}
+                                {wasMovedByStaff(group) && (
+                                    <span className="rounded-full bg-purple-100 px-2 py-0.5 font-semibold text-purple-700">
+                                        Moved by staff
                                     </span>
                                 )}
                             </div>
@@ -181,6 +192,7 @@ function VenuePage() {
 
     const [venue, setVenue] = useState<Venue | null>(null)
     const [isOwner, setIsOwner] = useState(false)
+    const [isStaff, setIsStaff] = useState(false)
     const [profile, setProfile] = useState<MiniProfile | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -247,6 +259,7 @@ function VenuePage() {
                 ])
 
                 setIsOwner(membershipResult.data?.role === 'owner')
+                setIsStaff(Boolean(membershipResult.data))
                 setProfile((profileResult.data as MiniProfile | null) ?? null)
             }
 
@@ -287,13 +300,23 @@ function VenuePage() {
                         )}
                     </div>
 
-                    {isOwner && (
-                        <Link
-                            to={`/local/${venue.code}/manage`}
-                            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                            Manage venue
-                        </Link>
+                    {isStaff && (
+                        <div className="flex gap-2">
+                            <Link
+                                to={`/local/${venue.code}/staff`}
+                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                                Staff queue
+                            </Link>
+                            {isOwner && (
+                                <Link
+                                    to={`/local/${venue.code}/manage`}
+                                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                >
+                                    Manage venue
+                                </Link>
+                            )}
+                        </div>
                     )}
                 </div>
 
