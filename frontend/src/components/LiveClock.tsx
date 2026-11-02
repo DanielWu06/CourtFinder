@@ -26,25 +26,44 @@ export function Countdown({ until }: { until: string }) {
     return <span className="tabular-nums">{formatClock(remaining)}</span>
 }
 
-// Counts up from a time. With a limit, shows overtime in red once passed.
 export function Elapsed({
     since,
     limitMinutes,
+    extraMinutes = 0,
+    strict = false,
 }: {
     since: string
     limitMinutes?: number | null
+    extraMinutes?: number
+    strict?: boolean
 }) {
     const now = useNow()
     const elapsed = Math.max(0, now - new Date(since).getTime())
-    const limitMs = limitMinutes ? limitMinutes * 60000 : null
+    const limitMs = limitMinutes ? (limitMinutes + extraMinutes) * 60000 : null
 
-    if (limitMs && elapsed > limitMs) {
+    if (!limitMs) {
+        return <span className="tabular-nums">{formatClock(elapsed)}</span>
+    }
+
+    if (elapsed > limitMs) {
         return (
-            <span className="font-semibold tabular-nums text-red-600">
-                Overtime +{formatClock(elapsed - limitMs)}
+            <span className="tabular-nums">
+                {formatClock(elapsed)} ·{' '}
+                <span className="font-semibold text-red-600">
+                    {strict ? "Time's up" : `Overtime +${formatClock(elapsed - limitMs)}`}
+                </span>
             </span>
         )
     }
 
-    return <span className="tabular-nums">{formatClock(elapsed)}</span>
+    const left = limitMs - elapsed
+
+    return (
+        <span className="tabular-nums">
+            {formatClock(elapsed)} ·{' '}
+            <span className={left < 120000 ? 'font-semibold text-amber-600' : ''}>
+                {formatClock(left)} left
+            </span>
+        </span>
+    )
 }

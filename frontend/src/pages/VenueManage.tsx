@@ -10,7 +10,7 @@ import {
     PLAYERS_NEEDED,
     type Venue,
     type Court,
-} from '../lib/venues.ts'
+} from '../lib/venues'
 
 const inputClass =
     'mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
@@ -22,11 +22,6 @@ function inRange(value: string, min: number, max: number) {
     return value.trim() !== '' && Number.isInteger(n) && n >= min && n <= max
 }
 
-// ---------------------------------------------------------------
-// Venue details + queue settings
-// ---------------------------------------------------------------
-// SHORT-TERM: these settings are saved but nothing reads them until the
-// queue exists (step 2).
 function SettingsForm({
     venue,
     onSaved,
@@ -198,8 +193,8 @@ function SettingsForm({
                     <span>
                         <span className="font-medium">Strict time limit</span>
                         <span className={hintClass}>
-                            When on, the court is freed and the next group called at the limit.
-                            When off, an overtime timer is shown. Needs a time limit.
+                            When on, a game past the limit is ended and the court handed to the next group, but only if a matching group is waiting and automatic calling is on.
+                            When off, an overtime timer is shown and staff decide. Needs a time limit.
                         </span>
                     </span>
                 </label>
@@ -218,9 +213,6 @@ function SettingsForm({
     )
 }
 
-// ---------------------------------------------------------------
-// One court's editor
-// ---------------------------------------------------------------
 function CourtEditor({
     court,
     onChanged,

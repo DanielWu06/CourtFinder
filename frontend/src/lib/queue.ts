@@ -28,11 +28,12 @@ export type QueueGroup = {
     walk_up: boolean
     staff_action: string | null
     staff_action_at: string | null
+    extra_minutes: number
     group_members: GroupMember[]
 }
 
 export const GROUP_SELECT =
-    'id, venue_id, leader_id, sport, players_needed, skill_level, status, sort_key, defer_count, deferred_until, court_id, called_at, expires_at, started_at, walk_up, staff_action, staff_action_at, group_members(id, user_id, guest_name, joined_at, profile:profiles!group_members_user_id_fkey(display_name))'
+    'id, venue_id, leader_id, sport, players_needed, skill_level, status, sort_key, defer_count, deferred_until, court_id, called_at, expires_at, started_at, walk_up, staff_action, staff_action_at, extra_minutes, group_members(id, user_id, guest_name, joined_at, profile:profiles!group_members_user_id_fkey(display_name))'
 
 export const MAX_GROUP_SIZE = 8
 
@@ -40,7 +41,8 @@ export function memberName(member: GroupMember) {
     return member.profile?.display_name || member.guest_name || 'Player'
 }
 
-// Walk-up groups are led by a staff member
+// Walk-up groups are led by the staff member who added them, so they're named
+// after their first listed person instead.
 export function leaderName(group: QueueGroup) {
     if (group.walk_up) {
         const first = group.group_members[0]
@@ -106,7 +108,8 @@ export const queueApi = {
     groupCode: (groupId: string) => supabase.rpc('get_group_code', { p_group_id: groupId }),
 }
 
-// Staff-only actions. They ignore other rules
+// Staff-only actions. They ignore eligibility rules and never count as
+// penalties; the database checks the caller belongs to the venue.
 export const staffApi = {
     addWalkup: (args: {
         venueId: string
@@ -123,6 +126,8 @@ export const staffApi = {
             p_names: args.names,
         }),
 
+    // Places a waiting group just after another waiting group, or at the
+    // front when afterGroupId is null.
     moveGroup: (groupId: string, afterGroupId: string | null) =>
         supabase.rpc('staff_move_group', {
             p_group_id: groupId,
@@ -131,6 +136,7 @@ export const staffApi = {
 
     removeGroup: (groupId: string) => supabase.rpc('staff_remove_group', { p_group_id: groupId }),
 
+    // start = false calls the group; start = true puts them straight on the court.
     assignCourt: (groupId: string, courtId: string, start: boolean) =>
         supabase.rpc('staff_assign_court', {
             p_group_id: groupId,
@@ -144,6 +150,9 @@ export const staffApi = {
     cancelCall: (groupId: string) => supabase.rpc('staff_cancel_call', { p_group_id: groupId }),
 
     endGame: (groupId: string) => supabase.rpc('staff_end_game', { p_group_id: groupId }),
+
+    extendGame: (groupId: string, minutes: number) =>
+        supabase.rpc('staff_extend_game', { p_group_id: groupId, p_minutes: minutes }),
 
     setCourtStatus: (courtId: string, status: 'available' | 'unavailable') =>
         supabase.rpc('staff_set_court_status', { p_court_id: courtId, p_status: status }),

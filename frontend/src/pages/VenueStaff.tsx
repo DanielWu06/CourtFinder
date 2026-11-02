@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import {
+    DndContext,
+    KeyboardSensor,
+    PointerSensor,
+    closestCenter,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+    SortableContext,
+    arrayMove,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
 import { SPORTS, PLAYER_SKILLS, labelFor, type Notice } from '../lib/listings'
@@ -51,9 +68,6 @@ function Chips({ group }: { group: QueueGroup }) {
     )
 }
 
-// ---------------------------------------------------------------
-// Courts
-// ---------------------------------------------------------------
 function CourtPanel({
     court,
     occupant,
@@ -112,7 +126,17 @@ function CourtPanel({
                     {occupant.status === 'playing' && occupant.started_at && (
                         <p className="mt-2">
                             Time on court:{' '}
-                            <Elapsed since={occupant.started_at} limitMinutes={venue.time_limit_minutes} />
+                            <Elapsed
+                                since={occupant.started_at}
+                                limitMinutes={venue.time_limit_minutes}
+                                extraMinutes={occupant.extra_minutes}
+                                strict={venue.strict_time_limit}
+                            />
+                            {occupant.extra_minutes > 0 && (
+                                <span className="ml-2 text-xs text-gray-500">
+                                    (+{occupant.extra_minutes} min granted)
+                                </span>
+                            )}
                         </p>
                     )}
                 </div>
@@ -156,9 +180,25 @@ function CourtPanel({
                     )}
 
                     {court.status === 'occupied' && occupant && (
-                        <button disabled={busy} onClick={endGame} className={dangerButton}>
-                            End game
-                        </button>
+                        <>
+                            {venue.time_limit_minutes && (
+                                <button
+                                    disabled={busy}
+                                    onClick={() =>
+                                        run(
+                                            () => staffApi.extendGame(occupant.id, 5),
+                                            `Gave ${groupTitle(occupant)} 5 more minutes.`
+                                        )
+                                    }
+                                    className={neutralButton}
+                                >
+                                    +5 min
+                                </button>
+                            )}
+                            <button disabled={busy} onClick={endGame} className={dangerButton}>
+                                End game
+                            </button>
+                        </>
                     )}
 
                     {court.status === 'available' && (
@@ -196,9 +236,6 @@ function CourtPanel({
     )
 }
 
-// ---------------------------------------------------------------
-// One waiting group in the queue
-// ---------------------------------------------------------------
 function GroupRow({
     group,
     index,
@@ -218,6 +255,13 @@ function GroupRow({
     const [courtId, setCourtId] = useState('')
     const [guestName, setGuestName] = useState('')
 
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: group.id,
+        disabled: busy,
+    })
+
+    const style = { transform: CSS.Transform.toString(transform), transition }
+
     const title = groupTitle(group)
     const missing = Math.max(0, group.players_needed - group.group_members.length)
     const skippedUntil =
@@ -227,7 +271,6 @@ function GroupRow({
 
     const isFirst = index === 0
     const isLast = index === orderedIds.length - 1
-    // Up = after the group two places above (or the front); Down = after the next one.
     const upTarget = index >= 2 ? orderedIds[index - 2] : null
     const downTarget = orderedIds[index + 1]
 
@@ -247,10 +290,30 @@ function GroupRow({
     }
 
     return (
-        <li className="rounded-xl border border-gray-200 bg-white p-4">
+        <li
+            ref={setNodeRef}
+            style={style}
+            className={`rounded-xl border bg-white p-4 ${
+                isDragging ? 'relative z-10 border-blue-300 shadow-lg' : 'border-gray-200'
+            }`}
+        >
             <div className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700">
-                    {index + 1}
+                <div className="flex flex-col items-center gap-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700">
+                        {index + 1}
+                    </div>
+
+                    <button
+                        type="button"
+                        aria-label={`Drag ${title} to reorder`}
+                        title="Drag to reorder"
+                        disabled={busy}
+                        {...attributes}
+                        {...listeners}
+                        className="cursor-grab touch-none rounded px-1 text-lg leading-none text-gray-400 hover:text-gray-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        ⋮⋮
+                    </button>
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -272,6 +335,11 @@ function GroupRow({
                                 Needs {missing} more
                             </span>
                         )}
+                        {group.defer_count > 0 && (
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                                Deferred {group.defer_count}×
+                            </span>
+                        )}
                         {skippedUntil && (
                             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
                                 Skipped for <Countdown until={skippedUntil} />
@@ -279,7 +347,7 @@ function GroupRow({
                         )}
                     </div>
 
-                    {/* Reordering */}
+                    {/* Reordering buttons (same action as dragging) */}
                     <div className="mt-3 flex flex-wrap gap-2">
                         <button
                             disabled={busy || isFirst}
@@ -579,6 +647,7 @@ const EVENT_LABELS: Record<string, string> = {
     staff_cancelled_call: 'had the call cancelled',
     staff_guest_added: 'had a name added by staff',
     staff_member_removed: 'had a player removed by staff',
+    staff_extended: 'was given more time',
     court_status: 'court status changed',
     auto_calling_on: 'automatic calling turned on',
     auto_calling_off: 'automatic calling turned off',
@@ -665,8 +734,18 @@ function VenueStaff() {
     const [loading, setLoading] = useState(true)
     const [busy, setBusy] = useState(false)
     const [notice, setNotice] = useState<Notice | null>(null)
+    // Shows a dropped group in its new place immediately, until the server
+    // confirms the move and the real order comes back.
+    const [localOrder, setLocalOrder] = useState<string[] | null>(null)
 
     const { courts, groups, loaded, error: queueError, refresh } = useVenueQueue(venue?.id)
+
+    // A small drag distance keeps ordinary clicks from starting a drag, and the
+    // keyboard sensor makes reordering possible without a mouse.
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    )
 
     const reloadVenue = useCallback(async () => {
         const { data } = await supabase
@@ -766,12 +845,39 @@ function VenueStaff() {
         )
     }
 
-    const waiting = groups
+    const serverWaiting = groups
         .filter((group) => group.status === 'waiting')
         .sort((a, b) => a.sort_key - b.sort_key)
+
+    const waiting = localOrder
+        ? [...serverWaiting].sort((a, b) => {
+              const first = localOrder.indexOf(a.id)
+              const second = localOrder.indexOf(b.id)
+              return (first === -1 ? 1e9 : first) - (second === -1 ? 1e9 : second)
+          })
+        : serverWaiting
+
     const orderedIds = waiting.map((group) => group.id)
 
     const freeCourts = courts.filter((court) => court.managed && court.status === 'available')
+
+    async function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event
+        if (!over || active.id === over.id) return
+
+        const movedId = String(active.id)
+        const from = orderedIds.indexOf(movedId)
+        const to = orderedIds.indexOf(String(over.id))
+        if (from === -1 || to === -1) return
+
+        const next = arrayMove(orderedIds, from, to)
+        const newIndex = next.indexOf(movedId)
+        const afterId = newIndex === 0 ? null : next[newIndex - 1]
+
+        setLocalOrder(next)
+        await run(() => staffApi.moveGroup(movedId, afterId))
+        setLocalOrder(null)
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -801,7 +907,7 @@ function VenueStaff() {
                         <p className="mt-1 text-sm text-gray-600">
                             {venue.auto_calling
                                 ? 'Free courts call the next matching group on their own. Your actions below still work.'
-                                : 'Use Call or Start now to put groups on courts. Calls already out still expire normally.'}
+                                : 'Use Call or Start now to put groups on courts. Calls already out still expire normally, and the strict time limit is paused.'}
                         </p>
                     </div>
                     <button disabled={busy} onClick={toggleAutoCalling} className={neutralButton}>
@@ -827,25 +933,41 @@ function VenueStaff() {
                             <h2 className="text-lg font-semibold text-gray-900">
                                 Waiting ({waiting.length})
                             </h2>
+                            {waiting.length > 1 && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Drag a group by its handle to reorder, or use the buttons.
+                                </p>
+                            )}
 
                             {!loaded ? (
                                 <p className="mt-3 text-sm text-gray-500">Loading the queue...</p>
                             ) : waiting.length === 0 ? (
                                 <p className="mt-3 text-sm text-gray-500">Nobody is waiting.</p>
                             ) : (
-                                <ol className="mt-3 space-y-3">
-                                    {waiting.map((group, index) => (
-                                        <GroupRow
-                                            key={group.id}
-                                            group={group}
-                                            index={index}
-                                            orderedIds={orderedIds}
-                                            freeCourts={freeCourts}
-                                            run={run}
-                                            busy={busy}
-                                        />
-                                    ))}
-                                </ol>
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <SortableContext
+                                        items={orderedIds}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <ol className="mt-3 space-y-3">
+                                            {waiting.map((group, index) => (
+                                                <GroupRow
+                                                    key={group.id}
+                                                    group={group}
+                                                    index={index}
+                                                    orderedIds={orderedIds}
+                                                    freeCourts={freeCourts}
+                                                    run={run}
+                                                    busy={busy}
+                                                />
+                                            ))}
+                                        </ol>
+                                    </SortableContext>
+                                </DndContext>
                             )}
                         </section>
 

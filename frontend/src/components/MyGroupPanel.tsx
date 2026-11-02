@@ -178,7 +178,18 @@ function MyGroupPanel({ group, venue, courts, userId, position, onChange, onNoti
                     {group.started_at && (
                         <p className="mt-1 text-sm text-blue-800">
                             Time on court:{' '}
-                            <Elapsed since={group.started_at} limitMinutes={venue.time_limit_minutes} />
+                            <Elapsed
+                                since={group.started_at}
+                                limitMinutes={venue.time_limit_minutes}
+                                extraMinutes={group.extra_minutes}
+                                strict={venue.strict_time_limit}
+                            />
+                            {venue.time_limit_minutes && venue.strict_time_limit && (
+                                <span className="mt-1 block text-xs text-blue-700">
+                                    Strict time limit: when time is up and others are waiting, the
+                                    court is handed to the next group.
+                                </span>
+                            )}
                         </p>
                     )}
                     <button

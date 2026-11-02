@@ -175,7 +175,12 @@ function CourtCard({
                     {occupant.status === 'playing' && occupant.started_at && (
                         <p className="mt-2">
                             Time on court:{' '}
-                            <Elapsed since={occupant.started_at} limitMinutes={venue.time_limit_minutes} />
+                            <Elapsed
+                                since={occupant.started_at}
+                                limitMinutes={venue.time_limit_minutes}
+                                extraMinutes={occupant.extra_minutes}
+                                strict={venue.strict_time_limit}
+                            />
                         </p>
                     )}
                 </div>
