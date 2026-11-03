@@ -67,6 +67,12 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
           />
         </label>
 
+        {isLogin && (
+          <p className="mt-2 text-right text-sm">
+            <Link to="/forgot-password" className="text-blue-600 hover:underline">Forgot password?</Link>
+          </p>
+        )}
+
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         {message && <p className="mt-4 text-sm text-green-600">{message}</p>}
 
