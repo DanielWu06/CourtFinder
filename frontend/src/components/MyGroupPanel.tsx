@@ -17,7 +17,6 @@ type Props = {
     venue: Venue
     courts: Court[]
     userId: string
-    // Place among waiting groups, or null when called or playing.
     position: number | null
     onChange: () => Promise<void>
     onNotice: (notice: Notice | null) => void

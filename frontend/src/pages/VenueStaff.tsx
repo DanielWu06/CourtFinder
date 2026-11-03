@@ -68,6 +68,9 @@ function Chips({ group }: { group: QueueGroup }) {
     )
 }
 
+// ---------------------------------------------------------------
+// Courts
+// ---------------------------------------------------------------
 function CourtPanel({
     court,
     occupant,
@@ -236,6 +239,9 @@ function CourtPanel({
     )
 }
 
+// ---------------------------------------------------------------
+// One waiting group in the queue (draggable by its handle)
+// ---------------------------------------------------------------
 function GroupRow({
     group,
     index,
@@ -271,6 +277,7 @@ function GroupRow({
 
     const isFirst = index === 0
     const isLast = index === orderedIds.length - 1
+    // Up = after the group two places above (or the front); Down = after the next one.
     const upTarget = index >= 2 ? orderedIds[index - 2] : null
     const downTarget = orderedIds[index + 1]
 
@@ -615,6 +622,118 @@ function WalkupForm({
 }
 
 // ---------------------------------------------------------------
+// Venue tools: clear the queue, close for the night, delete old history
+// ---------------------------------------------------------------
+function VenueTools({
+    venue,
+    isOwner,
+    queueCount,
+    run,
+    busy,
+}: {
+    venue: Venue
+    isOwner: boolean
+    // Waiting plus called groups.
+    queueCount: number
+    run: Run
+    busy: boolean
+}) {
+    const [days, setDays] = useState('30')
+
+    function clearQueue() {
+        const ok = window.confirm(
+            `Remove all ${queueCount} waiting or called ${queueCount === 1 ? 'group' : 'groups'}? Games in progress keep going.`
+        )
+        if (!ok) return
+
+        run(() => staffApi.clearVenue(venue.id, false), 'The queue was cleared.')
+    }
+
+    function closeForNight() {
+        const ok = window.confirm(
+            'Close for the night? This removes every group and ends every game in progress. Courts marked out of service stay that way.'
+        )
+        if (!ok) return
+
+        run(() => staffApi.clearVenue(venue.id, true), 'Everything was cleared for the night.')
+    }
+
+    function purgeHistory() {
+        const scope =
+            days === '0'
+                ? 'ALL finished games, groups and log entries'
+                : `finished games, groups and log entries older than ${days} days`
+
+        if (!window.confirm(`Permanently delete ${scope}? This can't be undone.`)) return
+
+        run(() => staffApi.purgeHistory(venue.id, Number(days)), 'Old history was deleted.')
+    }
+
+    return (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="font-semibold text-gray-900">Venue tools</h3>
+            <p className="mt-1 text-xs text-gray-500">For the end of a session. Every action is logged.</p>
+
+            <div className="mt-4 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-800">Clear the queue</p>
+                        <p className="text-xs text-gray-500">
+                            Removes every waiting or called group. Games in progress keep going.
+                        </p>
+                    </div>
+                    <button
+                        disabled={busy || queueCount === 0}
+                        onClick={clearQueue}
+                        className={dangerButton}
+                    >
+                        Clear queue ({queueCount})
+                    </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-800">Close for the night</p>
+                        <p className="text-xs text-gray-500">
+                            Clears the queue and ends every game in progress.
+                        </p>
+                    </div>
+                    <button disabled={busy} onClick={closeForNight} className={dangerButton}>
+                        Close for the night
+                    </button>
+                </div>
+
+                {isOwner && (
+                    <div className="border-t border-gray-100 pt-4">
+                        <p className="text-sm font-medium text-gray-800">Delete old history</p>
+                        <p className="text-xs text-gray-500">
+                            Permanently deletes finished games, groups and log entries. Groups still
+                            in the queue or on a court are never touched. Owner only.
+                        </p>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <select
+                                value={days}
+                                onChange={(event) => setDays(event.target.value)}
+                                className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs"
+                            >
+                                <option value="7">Older than 7 days</option>
+                                <option value="30">Older than 30 days</option>
+                                <option value="90">Older than 90 days</option>
+                                <option value="0">Everything finished</option>
+                            </select>
+                            <button disabled={busy} onClick={purgeHistory} className={dangerButton}>
+                                Delete history
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ---------------------------------------------------------------
 // Recent activity (from the action log)
 // ---------------------------------------------------------------
 type EventRow = {
@@ -649,6 +768,9 @@ const EVENT_LABELS: Record<string, string> = {
     staff_member_removed: 'had a player removed by staff',
     staff_extended: 'was given more time',
     court_status: 'court status changed',
+    queue_cleared: 'queue cleared by staff',
+    venue_closed: 'venue closed for the night',
+    history_purged: 'old history deleted',
     auto_calling_on: 'automatic calling turned on',
     auto_calling_off: 'automatic calling turned off',
 }
@@ -731,6 +853,7 @@ function VenueStaff() {
 
     const [venue, setVenue] = useState<Venue | null>(null)
     const [isStaff, setIsStaff] = useState(false)
+    const [role, setRole] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [busy, setBusy] = useState(false)
     const [notice, setNotice] = useState<Notice | null>(null)
@@ -785,6 +908,7 @@ function VenueStaff() {
                     .maybeSingle()
 
                 setIsStaff(Boolean(membership))
+                setRole((membership?.role as string | undefined) ?? null)
             }
 
             setLoading(false)
@@ -859,8 +983,14 @@ function VenueStaff() {
 
     const orderedIds = waiting.map((group) => group.id)
 
+    const queueCount = groups.filter(
+        (group) => group.status === 'waiting' || group.status === 'called'
+    ).length
+
     const freeCourts = courts.filter((court) => court.managed && court.status === 'available')
 
+    // Dropping a group sends one move: "place it after the group now above it",
+    // or to the front if it landed first. Same action as the Top/Up/Down buttons.
     async function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event
         if (!over || active.id === over.id) return
@@ -972,6 +1102,14 @@ function VenueStaff() {
                         </section>
 
                         <WalkupForm venue={venue} courts={courts} run={run} busy={busy} />
+
+                        <VenueTools
+                            venue={venue}
+                            isOwner={role === 'owner'}
+                            queueCount={queueCount}
+                            run={run}
+                            busy={busy}
+                        />
                     </div>
 
                     <div className="space-y-8">

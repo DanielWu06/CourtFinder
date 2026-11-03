@@ -151,6 +151,17 @@ export const staffApi = {
 
     endGame: (groupId: string) => supabase.rpc('staff_end_game', { p_group_id: groupId }),
 
+    // Clears every waiting or called group. With everything = true it also
+    // ends every game in progress (closing for the night).
+    clearVenue: (venueId: string, everything: boolean) =>
+        supabase.rpc('staff_clear_venue', { p_venue_id: venueId, p_everything: everything }),
+
+    // Owner only. Permanently deletes finished history older than `days`
+    // (0 = all finished history).
+    purgeHistory: (venueId: string, days: number) =>
+        supabase.rpc('staff_purge_history', { p_venue_id: venueId, p_days: days }),
+
+    // Gives a game in progress more time before a time limit applies.
     extendGame: (groupId: string, minutes: number) =>
         supabase.rpc('staff_extend_game', { p_group_id: groupId, p_minutes: minutes }),
 
