@@ -24,7 +24,7 @@ function App() {
           <Routes>
             {/* Public */}
             <Route path="/" element={<Home />} />
-            <Route path="/local" element={<LocalPlay />} />
+            
             <Route path="/login" element={<AuthPage mode="login" />} />
             <Route path="/signup" element={<AuthPage mode="signup" />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -39,6 +39,7 @@ function App() {
             <Route path="/local/:code" element={<ProtectedRoute><VenuePage /></ProtectedRoute>} />
             <Route path="/local/:code/manage" element={<ProtectedRoute><VenueManage /></ProtectedRoute>} />
             <Route path="/local/:code/staff" element={<ProtectedRoute><VenueStaff /></ProtectedRoute>} />
+            <Route path="/local" element={<ProtectedRoute><LocalPlay /></ProtectedRoute>} />
           </Routes>
       </AuthProvider>
   )
