@@ -15,8 +15,6 @@ export function useVenueQueue(venueId: string | undefined, intervalMs = 5000) {
     const loadOnce = useCallback(async () => {
         if (!venueId) return
 
-        // Expire overdue calls and fill free courts first; any open page can
-        // do this, so no scheduler is needed.
         await queueApi.process(venueId)
 
         const [courtResult, groupResult] = await Promise.all([
@@ -56,7 +54,6 @@ export function useVenueQueue(venueId: string | undefined, intervalMs = 5000) {
         setLoaded(true)
     }, [venueId])
 
-    // If a refresh is requested while one is running, run exactly one more
     const refresh = useCallback(async () => {
         if (!venueId) return
 
@@ -81,7 +78,6 @@ export function useVenueQueue(venueId: string | undefined, intervalMs = 5000) {
 
         refresh()
 
-        // Keeps running in background tabs
         const timer = window.setInterval(refresh, intervalMs)
 
         const onVisible = () => {
