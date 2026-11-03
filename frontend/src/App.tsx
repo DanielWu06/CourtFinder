@@ -14,6 +14,8 @@ import VenueNew from './pages/VenueNew'
 import VenueManage from './pages/VenueManage'
 import VenuePage from './pages/VenuePage'
 import VenueStaff from './pages/VenueStaff'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
             <Route path="/local" element={<LocalPlay />} />
             <Route path="/login" element={<AuthPage mode="login" />} />
             <Route path="/signup" element={<AuthPage mode="signup" />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Protected */}
             <Route path="/create" element={<ProtectedRoute><CreateListing /></ProtectedRoute>} />
